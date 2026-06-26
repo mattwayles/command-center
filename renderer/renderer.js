@@ -75,11 +75,16 @@ async function persistToSupabase() {
 // --- Load ---
 
 async function load() {
+  if (!supabase) {
+    showToast('Supabase not configured — check config.js');
+    render();
+    return;
+  }
   try {
-    if (supabase) await loadFromSupabase();
+    await loadFromSupabase();
   } catch (err) {
     console.error('Load failed:', err);
-    showToast('Failed to load from cloud.');
+    showToast('Failed to load from cloud: ' + err.message);
   }
   render();
 }
