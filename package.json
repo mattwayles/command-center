@@ -1,0 +1,32 @@
+{
+  "name": "command-center",
+  "version": "1.0.0",
+  "description": "Lightweight desktop command center",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build-icon": "node scripts/build-icon.mjs",
+    "dist": "electron-builder --mac",
+    "install-agent": "bash scripts/install-agent.sh"
+  },
+  "build": {
+    "productName": "Command Center",
+    "appId": "com.matthewwayles.commandcenter",
+    "mac": {
+      "category": "public.app-category.productivity",
+      "icon": "assets/icon.icns",
+      "target": "dir"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer/**"
+    ]
+  },
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^26.8.1",
+    "playwright-core": "^1.60.0",
+    "sharp": "^0.34.5"
+  }
+}

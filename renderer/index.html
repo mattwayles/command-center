@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Command Center</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="titlebar"></div>
+
+  <nav class="tab-bar"></nav>
+
+  <div class="app">
+    <header class="header">
+      <div class="filter-bar">
+        <button class="filter-btn active" data-filter="all">All</button>
+        <button class="filter-btn" data-filter="active">Active</button>
+        <button class="filter-btn" data-filter="done">Done</button>
+      </div>
+    </header>
+
+    <div class="input-row">
+      <select id="priority-select" class="priority-select">
+        <option value="high">● High</option>
+        <option value="medium">● Medium</option>
+        <option value="low">● Low</option>
+      </select>
+      <input
+        id="new-todo"
+        class="new-todo"
+        type="text"
+        placeholder="Add a task…"
+        autocomplete="off"
+      />
+      <button id="add-btn" class="add-btn">Add</button>
+    </div>
+
+    <ul id="todo-list" class="todo-list"></ul>
+
+    <footer class="footer">
+      <span id="count-label" class="count-label"></span>
+      <button id="clear-done-btn" class="clear-btn">Clear done</button>
+    </footer>
+
+  <div id="trivia-panel" class="trivia-panel" style="display:none">
+    <div id="trivia-master-banner" class="trivia-master-banner" style="display:none">YOU'RE TRIVIA MASTER</div>
+    <div class="standup-trivia-row">
+      <button id="standup-btn" class="standup-btn">Get Standup</button>
+      <div class="trivia-col">
+        <div class="trivia-controls">
+          <input id="trivia-amount" class="trivia-amount-input" type="number" min="1" max="50" placeholder="10" />
+          <button id="trivia-btn" class="trivia-btn">Get Trivia</button>
+        </div>
+        <label class="trivia-master-label">
+          <input id="trivia-master-check" type="checkbox" />
+          Tomorrow's Trivia Master
+        </label>
+      </div>
+    </div>
+    <p id="trivia-filtered" class="trivia-filtered" style="display:none"></p>
+    <div id="standup-output" class="standup-output" style="display:none"></div>
+    <div id="trivia-results" class="trivia-results"></div>
+    <div class="standup-footer">
+      <button id="standup-clear-btn" class="standup-clear-btn" style="display:none">Clear</button>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+  </div>
+
+  <!-- Generic confirm modal -->
+  <div id="confirm-overlay" class="modal-overlay hidden">
+    <div class="modal">
+      <h2 id="confirm-title"></h2>
+      <p id="confirm-msg" class="delete-tab-msg"></p>
+      <div class="modal-actions">
+        <button id="confirm-cancel" class="modal-btn secondary">Cancel</button>
+        <button id="confirm-ok" class="modal-btn danger">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit modal -->
+  <div id="modal-overlay" class="modal-overlay hidden">
+    <div class="modal">
+      <h2>Edit task</h2>
+      <input id="edit-input" class="edit-input" type="text" />
+      <div class="modal-priority-row">
+        <label>Priority</label>
+        <select id="edit-priority" class="priority-select">
+          <option value="high">● High</option>
+          <option value="medium">● Medium</option>
+          <option value="low">● Low</option>
+        </select>
+      </div>
+      <div class="modal-actions">
+        <button id="modal-cancel" class="modal-btn secondary">Cancel</button>
+        <button id="modal-save" class="modal-btn primary">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script src="renderer.js"></script>
+</body>
+</html>
