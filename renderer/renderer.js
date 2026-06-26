@@ -11,12 +11,8 @@ const supabase = (
 ) ? window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY)
   : null;
 
-let tabDefs = [
-  { id: 'tasks',     label: 'Tasks' },
-  { id: 'agenticAI', label: 'Agentic AI' },
-];
-
-let activeTab = tabDefs[0].id;
+let tabDefs = [];
+let activeTab = null;
 let tabState  = {};
 let confirmCallback = null;
 let dragId = null;
@@ -37,71 +33,8 @@ function closeConfirm() {
   document.getElementById('confirm-overlay').classList.add('hidden');
 }
 
-tabDefs.forEach(t => { tabState[t.id] = { tasks: [], filter: 'all' }; });
-
 function tab()   { return tabState[activeTab] || (tabState[activeTab] = { tasks: [], filter: 'all' }); }
 function tasks() { return tab().tasks; }
-
-// --- Persistence helpers ---
-
-function getPayload() {
-  const payload = { tabs: tabDefs };
-  tabDefs.forEach(t => { payload[t.id] = tabState[t.id]?.tasks || []; });
-  return payload;
-}
-
-function loadDefaults() {
-  tabDefs = [
-    { id: 'tasks',     label: 'Tasks' },
-    { id: 'agenticAI', label: 'Agentic AI' },
-  ];
-  tabState = {};
-  tabDefs.forEach(t => { tabState[t.id] = { tasks: [], filter: 'all' }; });
-}
-
-function applyRawData(raw) {
-  if (Array.isArray(raw)) {
-    tabDefs = [
-      { id: 'tasks',     label: 'Tasks' },
-      { id: 'agenticAI', label: 'Agentic AI' },
-    ];
-    tabState = {
-      tasks:     { tasks: raw, filter: 'all' },
-      agenticAI: { tasks: [],  filter: 'all' },
-    };
-  } else if (raw && typeof raw === 'object') {
-    tabDefs = (Array.isArray(raw.tabs) && raw.tabs.length > 0) ? raw.tabs : [
-      { id: 'tasks',     label: 'Tasks' },
-      { id: 'agenticAI', label: 'Agentic AI' },
-    ];
-    tabState = {};
-    tabDefs.forEach(t => {
-      tabState[t.id] = { tasks: Array.isArray(raw[t.id]) ? raw[t.id] : [], filter: 'all' };
-    });
-  } else {
-    loadDefaults();
-  }
-}
-
-function ensureRequiredTabs() {
-  if (isElectron) {
-    if (!tabDefs.find(t => t.id === 'trivia')) {
-      tabDefs.push({ id: 'trivia', label: 'Standup', type: 'trivia' });
-      tabState['trivia'] = { tasks: [], filter: 'all' };
-    } else {
-      const t = tabDefs.find(t => t.id === 'trivia');
-      t.label = 'Standup';
-      t.type  = 'trivia';
-    }
-    const triIdx = tabDefs.findIndex(t => t.id === 'trivia');
-    const agIdx  = tabDefs.findIndex(t => t.id === 'agenticAI');
-    if (triIdx > -1 && agIdx > -1 && triIdx > agIdx) {
-      const [triTab] = tabDefs.splice(triIdx, 1);
-      tabDefs.splice(tabDefs.findIndex(t => t.id === 'agenticAI'), 0, triTab);
-    }
-  }
-  if (!tabDefs.find(t => t.id === activeTab)) activeTab = tabDefs[0].id;
-}
 
 // --- Supabase sync ---
 
@@ -116,14 +49,16 @@ async function persistToSupabase() {
       await supabase.from('tasks').delete().in('id', [...pendingTaskDeletes]);
       pendingTaskDeletes.clear();
     }
-    if (tabDefs.length) {
+    // Exclude the Standup tab — it's Electron-only and never stored in Supabase
+    const syncableTabs = tabDefs.filter(t => t.type !== 'trivia');
+    if (syncableTabs.length) {
       await supabase.from('tabs').upsert(
-        tabDefs.map((t, i) => ({ id: t.id, label: t.label, type: t.type || null, sort_order: i })),
+        syncableTabs.map((t, i) => ({ id: t.id, label: t.label, type: t.type || null, sort_order: i })),
         { onConflict: 'id' }
       );
     }
     const allTasks = [];
-    tabDefs.forEach(t => {
+    syncableTabs.forEach(t => {
       (tabState[t.id]?.tasks || []).forEach((task, i) => {
         allTasks.push({ id: task.id, tab_id: t.id, text: task.text, priority: task.priority, done: task.done, sort_order: i });
       });
@@ -141,18 +76,10 @@ async function persistToSupabase() {
 
 async function load() {
   try {
-    if (supabase) {
-      await loadFromSupabase();
-    } else if (isElectron) {
-      await loadFromLocal();
-    } else {
-      loadDefaults();
-      ensureRequiredTabs();
-    }
+    if (supabase) await loadFromSupabase();
   } catch (err) {
-    console.error('Load failed, falling back to defaults:', err);
-    loadDefaults();
-    ensureRequiredTabs();
+    console.error('Load failed:', err);
+    showToast('Failed to load from cloud.');
   }
   render();
 }
@@ -164,47 +91,34 @@ async function loadFromSupabase() {
   ]);
 
   if (tabErr || taskErr) {
-    showToast('Failed to load from cloud: ' + (tabErr || taskErr).message);
-    loadDefaults();
-  } else if (tabRows && tabRows.length > 0) {
-    tabDefs = tabRows.map(r => Object.assign({ id: r.id, label: r.label }, r.type ? { type: r.type } : {}));
-    tabState = {};
-    tabDefs.forEach(t => {
-      tabState[t.id] = {
-        tasks: (taskRows || [])
-          .filter(r => r.tab_id === t.id)
-          .map(r => ({ id: r.id, text: r.text, priority: r.priority, done: r.done })),
-        filter: 'all',
-      };
-    });
-  } else {
-    // Empty DB — migrate from local file on Electron, else start fresh
-    if (isElectron) {
-      const raw = await window.api.loadTasks().catch(() => null);
-      applyRawData(raw);
-    } else {
-      loadDefaults();
-    }
+    showToast('Cloud load failed: ' + (tabErr || taskErr).message);
+    return;
   }
 
-  ensureRequiredTabs();
-  await persistToSupabase(); // Seed DB and/or fix tab schema on every startup
-}
+  tabDefs = (tabRows || []).map(r => ({ id: r.id, label: r.label, ...(r.type ? { type: r.type } : {}) }));
+  tabState = {};
+  tabDefs.forEach(t => {
+    tabState[t.id] = {
+      tasks: (taskRows || [])
+        .filter(r => r.tab_id === t.id)
+        .map(r => ({ id: r.id, text: r.text, priority: r.priority, done: r.done })),
+      filter: 'all',
+    };
+  });
 
-async function loadFromLocal() {
-  const raw = await window.api.loadTasks().catch(() => null);
-  applyRawData(raw);
-  ensureRequiredTabs();
+  // Standup tab is Electron-only; appended in-memory, never stored in Supabase
+  if (isElectron && !tabDefs.find(t => t.id === 'trivia')) {
+    tabDefs.push({ id: 'trivia', label: 'Standup', type: 'trivia' });
+    tabState['trivia'] = { tasks: [], filter: 'all' };
+  }
+
+  if (tabDefs.length && !tabDefs.find(t => t.id === activeTab)) activeTab = tabDefs[0].id;
 }
 
 // --- Persist ---
 
 function persist() {
-  if (supabase) {
-    persistToSupabase(); // fire-and-forget; errors surface as toasts
-  } else if (isElectron) {
-    window.api.saveTasks(getPayload());
-  }
+  if (supabase) persistToSupabase();
 }
 
 // --- Task mutations ---
