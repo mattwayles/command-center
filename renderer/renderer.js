@@ -5,7 +5,8 @@ const PRIORITY_RANK = { high: 0, medium: 1, low: 2 };
 const isElectron = typeof window.api !== 'undefined';
 
 // --- Supabase client (null if config.js placeholders not yet replaced) ---
-const supabase = (
+// Named 'db' to avoid collision with the global 'supabase' exported by the CDN script
+const db = (
   window.SUPABASE_URL && window.SUPABASE_URL !== 'YOUR_SUPABASE_URL' &&
   window.SUPABASE_ANON_KEY && window.supabase
 ) ? window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY)
@@ -39,20 +40,20 @@ function tasks() { return tab().tasks; }
 // --- Supabase sync ---
 
 async function persistToSupabase() {
-  if (!supabase) return;
+  if (!db) return;
   try {
     if (pendingTabDeletes.size) {
-      await supabase.from('tabs').delete().in('id', [...pendingTabDeletes]);
+      await db.from('tabs').delete().in('id', [...pendingTabDeletes]);
       pendingTabDeletes.clear();
     }
     if (pendingTaskDeletes.size) {
-      await supabase.from('tasks').delete().in('id', [...pendingTaskDeletes]);
+      await db.from('tasks').delete().in('id', [...pendingTaskDeletes]);
       pendingTaskDeletes.clear();
     }
     // Exclude the Standup tab — it's Electron-only and never stored in Supabase
     const syncableTabs = tabDefs.filter(t => t.type !== 'trivia');
     if (syncableTabs.length) {
-      await supabase.from('tabs').upsert(
+      await db.from('tabs').upsert(
         syncableTabs.map((t, i) => ({ id: t.id, label: t.label, type: t.type || null, sort_order: i })),
         { onConflict: 'id' }
       );
@@ -64,7 +65,7 @@ async function persistToSupabase() {
       });
     });
     if (allTasks.length) {
-      await supabase.from('tasks').upsert(allTasks, { onConflict: 'id' });
+      await db.from('tasks').upsert(allTasks, { onConflict: 'id' });
     }
   } catch (err) {
     console.error('Supabase sync failed:', err);
@@ -75,7 +76,7 @@ async function persistToSupabase() {
 // --- Load ---
 
 async function load() {
-  if (!supabase) {
+  if (!db) {
     showToast('Supabase not configured — check config.js');
     render();
     return;
@@ -91,8 +92,8 @@ async function load() {
 
 async function loadFromSupabase() {
   const [{ data: tabRows, error: tabErr }, { data: taskRows, error: taskErr }] = await Promise.all([
-    supabase.from('tabs').select('*').order('sort_order'),
-    supabase.from('tasks').select('*').order('sort_order'),
+    db.from('tabs').select('*').order('sort_order'),
+    db.from('tasks').select('*').order('sort_order'),
   ]);
 
   if (tabErr || taskErr) {
@@ -123,7 +124,7 @@ async function loadFromSupabase() {
 // --- Persist ---
 
 function persist() {
-  if (supabase) persistToSupabase();
+  if (db) persistToSupabase();
 }
 
 // --- Task mutations ---
