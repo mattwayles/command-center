@@ -17,6 +17,8 @@ let activeTab = null;
 let tabState  = {};
 let confirmCallback = null;
 let dragId = null;
+let currentUser = null;
+let authMode = 'login';
 
 // Deletions that must be removed from Supabase on next persist()
 const pendingTaskDeletes = new Set();
@@ -40,7 +42,7 @@ function tasks() { return tab().tasks; }
 // --- Supabase sync ---
 
 async function persistToSupabase() {
-  if (!db) return;
+  if (!db || !currentUser) return;
   try {
     if (pendingTabDeletes.size) {
       await db.from('tabs').delete().in('id', [...pendingTabDeletes]);
@@ -54,14 +56,14 @@ async function persistToSupabase() {
     const syncableTabs = tabDefs.filter(t => t.type !== 'trivia');
     if (syncableTabs.length) {
       await db.from('tabs').upsert(
-        syncableTabs.map((t, i) => ({ id: t.id, label: t.label, type: t.type || null, sort_order: i })),
+        syncableTabs.map((t, i) => ({ id: t.id, label: t.label, type: t.type || null, sort_order: i, user_id: currentUser.id })),
         { onConflict: 'id' }
       );
     }
     const allTasks = [];
     syncableTabs.forEach(t => {
       (tabState[t.id]?.tasks || []).forEach((task, i) => {
-        allTasks.push({ id: task.id, tab_id: t.id, text: task.text, priority: task.priority, done: task.done, sort_order: i });
+        allTasks.push({ id: task.id, tab_id: t.id, text: task.text, priority: task.priority, done: task.done, sort_order: i, user_id: currentUser.id });
       });
     });
     if (allTasks.length) {
@@ -73,6 +75,22 @@ async function persistToSupabase() {
   }
 }
 
+// --- Auth ---
+
+function showAuthOverlay() {
+  document.getElementById('auth-overlay').classList.remove('hidden');
+}
+
+function hideAuthOverlay() {
+  document.getElementById('auth-overlay').classList.add('hidden');
+}
+
+async function signOut() {
+  pendingTaskDeletes.clear();
+  pendingTabDeletes.clear();
+  await db.auth.signOut();
+}
+
 // --- Load ---
 
 async function load() {
@@ -81,13 +99,26 @@ async function load() {
     render();
     return;
   }
-  try {
-    await loadFromSupabase();
-  } catch (err) {
-    console.error('Load failed:', err);
-    showToast('Failed to load from cloud: ' + err.message);
-  }
-  render();
+
+  db.auth.onAuthStateChange(async (event, session) => {
+    if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
+      if (session) {
+        currentUser = session.user;
+        hideAuthOverlay();
+        try { await loadFromSupabase(); } catch (err) { showToast('Load failed: ' + err.message); }
+        render();
+      } else {
+        showAuthOverlay();
+      }
+    } else if (event === 'SIGNED_OUT') {
+      currentUser = null;
+      tabDefs = []; tabState = {}; activeTab = null;
+      pendingTaskDeletes.clear();
+      pendingTabDeletes.clear();
+      render();
+      showAuthOverlay();
+    }
+  });
 }
 
 async function loadFromSupabase() {
@@ -332,6 +363,14 @@ function renderTabs() {
   refreshBtn.textContent = '↺';
   refreshBtn.title = 'Refresh from cloud';
   tabBar.appendChild(refreshBtn);
+
+  if (db && currentUser) {
+    const logoutBtn = document.createElement('button');
+    logoutBtn.className = 'tab-logout';
+    logoutBtn.textContent = '⏻';
+    logoutBtn.title = `Signed in as ${currentUser.email} — click to sign out`;
+    tabBar.appendChild(logoutBtn);
+  }
 }
 
 function renderFilters() {
@@ -478,11 +517,13 @@ document.querySelector('.tab-bar').addEventListener('click', e => {
   const closeBtn   = e.target.closest('.tab-close');
   const addBtn     = e.target.closest('.tab-add');
   const refreshBtn = e.target.closest('.tab-refresh');
+  const logoutBtn  = e.target.closest('.tab-logout');
   const tabBtn     = e.target.closest('.tab');
 
   if (closeBtn)   { removeTab(closeBtn.closest('.tab').dataset.tab); return; }
   if (addBtn)     { addTab(); return; }
   if (refreshBtn) { refresh(); return; }
+  if (logoutBtn)  { signOut(); return; }
   if (tabBtn)     { activeTab = tabBtn.dataset.tab; render(); }
 });
 
@@ -835,6 +876,54 @@ document.getElementById('trivia-btn').addEventListener('click', async () => {
 
 document.getElementById('trivia-amount').addEventListener('keydown', e => {
   if (e.key === 'Enter') document.getElementById('trivia-btn').click();
+});
+
+// --- Auth form ---
+
+document.querySelectorAll('.auth-tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    authMode = btn.dataset.mode;
+    document.querySelectorAll('.auth-tab').forEach(b => b.classList.toggle('active', b === btn));
+    document.getElementById('auth-submit').textContent = authMode === 'login' ? 'Log in' : 'Sign up';
+    document.getElementById('auth-password').autocomplete = authMode === 'login' ? 'current-password' : 'new-password';
+    const errEl = document.getElementById('auth-error');
+    errEl.classList.add('hidden');
+    errEl.classList.remove('success');
+  });
+});
+
+document.getElementById('auth-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  if (!db) return;
+  const email     = document.getElementById('auth-email').value.trim();
+  const password  = document.getElementById('auth-password').value;
+  const submitBtn = document.getElementById('auth-submit');
+  const errEl     = document.getElementById('auth-error');
+
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Loading…';
+  errEl.classList.add('hidden');
+  errEl.classList.remove('success');
+
+  try {
+    if (authMode === 'login') {
+      const { error } = await db.auth.signInWithPassword({ email, password });
+      if (error) { errEl.textContent = error.message; errEl.classList.remove('hidden'); }
+    } else {
+      const { data, error } = await db.auth.signUp({ email, password });
+      if (error) {
+        errEl.textContent = error.message;
+        errEl.classList.remove('hidden');
+      } else if (data.user && !data.session) {
+        errEl.textContent = 'Check your email for a confirmation link.';
+        errEl.classList.add('success');
+        errEl.classList.remove('hidden');
+      }
+    }
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = authMode === 'login' ? 'Log in' : 'Sign up';
+  }
 });
 
 // --- Boot ---

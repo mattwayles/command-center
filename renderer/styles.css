@@ -758,3 +758,106 @@ h1 {
 }
 
 .empty-state .icon { font-size: 42px; }
+
+/* Auth overlay */
+.auth-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 300;
+}
+.auth-overlay.hidden { display: none; }
+
+.auth-card {
+  background: var(--surface);
+  border-radius: 14px;
+  padding: 36px 32px;
+  width: 380px;
+  border: 1px solid var(--surface2);
+  animation: modal-in 0.2s ease;
+}
+
+.auth-title {
+  font-size: 22px;
+  font-weight: 700;
+  text-align: center;
+  margin-bottom: 24px;
+  letter-spacing: -0.5px;
+}
+
+.auth-tabs {
+  display: flex;
+  background: var(--bg);
+  border-radius: 8px;
+  padding: 3px;
+  margin-bottom: 20px;
+}
+
+.auth-tab {
+  flex: 1;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 7px 0;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: inherit;
+  transition: background 0.15s, color 0.15s;
+}
+.auth-tab.active { background: var(--accent); color: #fff; }
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.auth-input {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--surface2);
+  color: var(--text);
+  border-radius: var(--radius);
+  padding: 11px 14px;
+  font-size: 15px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.auth-input:focus { border-color: var(--accent); }
+.auth-input::placeholder { color: var(--text-muted); }
+
+.auth-error {
+  font-size: 13px;
+  color: var(--high);
+  margin: 0;
+  text-align: center;
+  line-height: 1.4;
+}
+.auth-error.hidden  { display: none; }
+.auth-error.success { color: var(--low); }
+
+.auth-submit {
+  width: 100%;
+  padding: 12px;
+  font-size: 15px;
+}
+
+/* Logout button */
+.tab-logout {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+  padding: 4px 8px;
+  transition: color 0.15s;
+  align-self: center;
+}
+.tab-logout:hover { color: var(--high); }
