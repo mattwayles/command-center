@@ -28,6 +28,13 @@ function loadTasks() {
     if (fs.existsSync(DATA_FILE)) {
       return JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
     }
+    // One-time rename: todos.json → tasks.json within the same userData directory
+    const oldFile = path.join(path.dirname(DATA_FILE), 'todos.json');
+    if (fs.existsSync(oldFile)) {
+      const data = JSON.parse(fs.readFileSync(oldFile, 'utf8'));
+      fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2), 'utf8');
+      return data;
+    }
   } catch {}
   return [];
 }

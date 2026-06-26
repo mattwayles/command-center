@@ -140,11 +140,17 @@ async function persistToSupabase() {
 // --- Load ---
 
 async function load() {
-  if (supabase) {
-    await loadFromSupabase();
-  } else if (isElectron) {
-    await loadFromLocal();
-  } else {
+  try {
+    if (supabase) {
+      await loadFromSupabase();
+    } else if (isElectron) {
+      await loadFromLocal();
+    } else {
+      loadDefaults();
+      ensureRequiredTabs();
+    }
+  } catch (err) {
+    console.error('Load failed, falling back to defaults:', err);
     loadDefaults();
     ensureRequiredTabs();
   }
