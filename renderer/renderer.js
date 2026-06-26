@@ -121,6 +121,20 @@ async function loadFromSupabase() {
   if (tabDefs.length && !tabDefs.find(t => t.id === activeTab)) activeTab = tabDefs[0].id;
 }
 
+// --- Refresh ---
+
+async function refresh() {
+  if (!db) return;
+  const btn = document.getElementById('refresh-btn');
+  if (btn) { btn.disabled = true; btn.classList.add('spinning'); }
+  try {
+    await loadFromSupabase();
+  } catch (err) {
+    showToast('Refresh failed: ' + err.message);
+  }
+  render();
+}
+
 // --- Persist ---
 
 function persist() {
@@ -311,6 +325,13 @@ function renderTabs() {
   addBtn.textContent = '+';
   addBtn.title = 'New tab';
   tabBar.appendChild(addBtn);
+
+  const refreshBtn = document.createElement('button');
+  refreshBtn.id = 'refresh-btn';
+  refreshBtn.className = 'tab-refresh';
+  refreshBtn.textContent = '↺';
+  refreshBtn.title = 'Refresh from cloud';
+  tabBar.appendChild(refreshBtn);
 }
 
 function renderFilters() {
@@ -454,13 +475,15 @@ function confirmEdit() {
 // --- Event wiring ---
 
 document.querySelector('.tab-bar').addEventListener('click', e => {
-  const closeBtn = e.target.closest('.tab-close');
-  const addBtn   = e.target.closest('.tab-add');
-  const tabBtn   = e.target.closest('.tab');
+  const closeBtn   = e.target.closest('.tab-close');
+  const addBtn     = e.target.closest('.tab-add');
+  const refreshBtn = e.target.closest('.tab-refresh');
+  const tabBtn     = e.target.closest('.tab');
 
-  if (closeBtn) { removeTab(closeBtn.closest('.tab').dataset.tab); return; }
-  if (addBtn)   { addTab(); return; }
-  if (tabBtn)   { activeTab = tabBtn.dataset.tab; render(); }
+  if (closeBtn)   { removeTab(closeBtn.closest('.tab').dataset.tab); return; }
+  if (addBtn)     { addTab(); return; }
+  if (refreshBtn) { refresh(); return; }
+  if (tabBtn)     { activeTab = tabBtn.dataset.tab; render(); }
 });
 
 document.querySelector('.tab-bar').addEventListener('dblclick', e => {

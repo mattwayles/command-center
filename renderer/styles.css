@@ -103,6 +103,27 @@ body {
 }
 .tab-add:hover { color: var(--text); }
 
+.tab-refresh {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 4px 8px;
+  transition: color 0.15s;
+  align-self: center;
+  margin-left: auto;
+}
+.tab-refresh:hover:not(:disabled) { color: var(--text); }
+.tab-refresh:disabled { cursor: default; }
+.tab-refresh.spinning { animation: spin 0.7s linear infinite; }
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
 .tab-rename-input {
   background: transparent;
   border: none;
