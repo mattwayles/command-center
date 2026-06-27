@@ -909,6 +909,9 @@ document.getElementById('auth-form').addEventListener('submit', async e => {
     if (authMode === 'login') {
       const { error } = await db.auth.signInWithPassword({ email, password });
       if (error) { errEl.textContent = error.message; errEl.classList.remove('hidden'); }
+      else if (navigator.credentials) {
+        navigator.credentials.store(new PasswordCredential({ id: email, password, name: email }));
+      }
     } else {
       const { data, error } = await db.auth.signUp({ email, password });
       if (error) {
